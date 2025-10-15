@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-from setuptools import setup, Extension
-import subprocess
 import shlex
+import subprocess
+
+from setuptools import Extension, setup
 
 
 def pkg_config_flags(package: str, flag: str) -> list[str]:
@@ -42,21 +43,25 @@ setup(
         "see the COPYING file for details."
     ),
     author="Stanislaw Klekot (original), Zafer Balkan (maintainer)",
-    author_email="",
+    author_email="dozzie@jarowit.net",
     maintainer="Zafer Balkan",
-    maintainer_email="",
+    maintainer_email="zafer@zaferbalkan.com",
     url="https://github.com/zaferbalkan/python-liblognorm",
     license="BSD-3-Clause",
     python_requires=">=3.5",
-    ext_modules=[ext],
-    package_data={
-        "": ["liblognorm.pyi", "py.typed"],
-    },
-    include_package_data=True,
+    ext_modules=[
+        Extension(
+            "liblognorm._liblognorm",
+            sources=["src/liblognorm/_liblognorm.c"],
+            extra_compile_args=cflags,
+            extra_link_args=ldflags,
+        ),
+    ],
+    package_dir={"": "src"},
+    packages=["liblognorm"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "Programming Language :: C",
-        "License :: OSI Approved :: BSD License",
         "Operating System :: POSIX :: Linux",
         "Topic :: System :: Logging",
         "Topic :: Software Development :: Libraries :: Python Modules",
