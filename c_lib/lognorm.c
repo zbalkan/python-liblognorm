@@ -251,7 +251,6 @@ static PyTypeObject TypeObject = {
     PyType_GenericNew,                   /* tp_new */
 };
 
-#if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     MODULE_NAME,         /* m_name */
@@ -263,32 +262,19 @@ static struct PyModuleDef moduledef = {
     NULL,                /* m_clear */
     NULL,                /* m_free */
 };
-#endif
 
-#if PY_MAJOR_VERSION >= 3
 PyMODINIT_FUNC PyInit_liblognorm(void)
-#else
-PyMODINIT_FUNC initliblognorm(void)
-#endif
+
 {
   PyObject* module;
   TypeObject.tp_new = PyType_GenericNew;
   if (PyType_Ready(&TypeObject) < 0)
-#if PY_MAJOR_VERSION >= 3
     return NULL;
-#else
-    return;
-#endif
 
-#if PY_MAJOR_VERSION >= 3
+
   module = PyModule_Create(&moduledef);
-#else
-  module = Py_InitModule3(MODULE_NAME, object_methods, MODULE_DOCSTRING);
-#endif
 
   Py_INCREF(&TypeObject);
   PyModule_AddObject(module, TYPE_NAME, (PyObject *)&TypeObject);
-#if PY_MAJOR_VERSION >= 3
   return module;
-#endif
 }
