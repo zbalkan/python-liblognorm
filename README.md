@@ -70,12 +70,7 @@ for line in sys.stdin:
     try:
         # 4. Normalize the log line into a dictionary
         event = ln.normalize(line)
-        if event:
-            print(json.dumps(event, indent=2))
-        else:
-            # This can happen if a line doesn't match any rule
-            print("--- No match ---")
-
+        print(json.dumps(event, indent=2))
     except liblognorm.Error as e:
         # Handle any normalization errors
         print(f"Error: {e}", file=sys.stderr)
@@ -127,3 +122,4 @@ This fork is maintained and modernized by **Zafer Balkan**, and includes the fol
 *   Python 3.5+ compatibility.
 
 `python-liblognorm` is distributed under the **3-clause BSD license**. See the included `COPYING` file for the full text.
+
