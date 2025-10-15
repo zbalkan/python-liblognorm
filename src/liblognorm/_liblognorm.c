@@ -78,13 +78,6 @@ void obj_dealloc(ObjectInstance *self)
 
 static PyObject* convert_object(json_object *obj);
 
-static PyObject* liblognorm_get_error(ObjectInstance *self, PyObject *Py_UNUSED(ignored))
-{
-    if (self->last_error[0] == '\0')
-        Py_RETURN_NONE;
-    return Py_BuildValue("s", self->last_error);
-}
-
 static PyObject* liblognorm_load(ObjectInstance *self, PyObject *args)
 {
     const char *path;
@@ -325,8 +318,6 @@ static PyMethodDef object_methods[] = {
     "parse log line to dict object"},
   {"load", (PyCFunction)liblognorm_load, METH_VARARGS,
     "Load a rulebase file or all rulebase files in a directory."},
-  {"get_error", (PyCFunction)liblognorm_get_error, METH_NOARGS,
-    "return last error message from liblognorm"},
   {NULL}
 };
 
