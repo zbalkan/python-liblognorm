@@ -84,28 +84,6 @@ All errors are raised as subclasses of `liblognorm.Error`:
 
 ---
 
-## Logging and Debug Output
-
-The extension integrates with Python’s standard [`logging`](https://docs.python.org/3/library/logging.html) module.
-
-If the logger named **`liblognorm`** has its level set to `DEBUG` **when a `Lognorm` instance is created**, internal debug output from the underlying C library will be enabled automatically.
-
-Example:
-
-```python
-import logging, liblognorm
-
-logging.basicConfig(level=logging.INFO)
-ln1 = liblognorm.Lognorm(rules="rules.rb")  # debug disabled
-
-logging.getLogger("liblognorm").setLevel(logging.DEBUG)
-ln2 = liblognorm.Lognorm(rules="rules.rb")  # debug enabled
-```
-
-Changing the Python logging configuration **after** initialization does not retroactively toggle debug output.
-
----
-
 ## Type Annotations
 
 Static type definitions are provided in `liblognorm.pyi`, enabling full support for type checkers and IDE autocompletion.

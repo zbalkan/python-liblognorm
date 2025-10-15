@@ -54,23 +54,6 @@ int obj_init(ObjectInstance *self, PyObject *args, PyObject *kwargs)
     return -1;
   }
 
-  // Enable logging
-  PyObject *logging = PyImport_ImportModule("logging");
-  if (logging) {
-    PyObject *logger = PyObject_CallMethod(logging, "getLogger", "s", "liblognorm");
-    if (logger) {
-        PyObject *isEnabledFor = PyObject_CallMethod(logger, "isEnabledFor", "i", 10); // logging.DEBUG == 10
-        if (isEnabledFor && PyObject_IsTrue(isEnabledFor)) {
-            ln_enableDebug(self->lognorm_context, 1);
-        } else {
-            ln_enableDebug(self->lognorm_context, 0);
-        }
-        Py_XDECREF(isEnabledFor);
-        Py_DECREF(logger);
-    }
-    Py_DECREF(logging);
-  }
-
   // Initiate error callback
   self->last_error[0] = '\0';
   ln_setErrMsgCB(self->lognorm_context, py_err_callback, self);
