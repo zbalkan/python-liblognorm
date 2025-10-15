@@ -18,7 +18,7 @@ Usage
     print(liblognorm.version()) # version liblognorm (not the binding module)
 
     rulebase = "parsing.rules"
-    lognorm = liblognorm.Lognorm(rulebase)
+    lognorm = liblognorm.Lognorm(rulebase) # Expects a file, not a directory
     log_line = sys.stdin.readline()
     event = lognorm.normalize(log_line.rstrip("\n"))
     print(json.dumps(event))
