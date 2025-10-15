@@ -3,6 +3,10 @@
 #include <string.h>
 #include <liblognorm.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <limits.h>
+
 
 #define MODULE_NAME "liblognorm"
 #define TYPE_NAME   "Lognorm"
@@ -42,11 +46,11 @@ void py_err_callback(void *cookie, const char *msg, size_t lenMsg)
 static
 int obj_init(ObjectInstance *self, PyObject *args, PyObject *kwargs)
 {
-  char *rulebase;
-  static char *kwlist[] = {"rules", NULL};
-
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist, &rulebase))
-    return -1;
+  if ((args && PyTuple_Size(args) > 0) ||
+        (kwargs && PyDict_Size(kwargs) > 0)) {
+        PyErr_SetString(PyExc_TypeError, "Lognorm() takes no arguments");
+        return -1;
+    }
 
   self->lognorm_context = ln_initCtx();
   if (self->lognorm_context == NULL) {
@@ -57,29 +61,6 @@ int obj_init(ObjectInstance *self, PyObject *args, PyObject *kwargs)
   // Initiate error callback
   self->last_error[0] = '\0';
   ln_setErrMsgCB(self->lognorm_context, py_err_callback, self);
-
-  // Load rules
-  int result = ln_loadSamples(self->lognorm_context, rulebase);
-  if (result != 0) {
-    switch (result) {
-      case LN_NOMEM:
-        PyErr_NoMemory();
-        break;
-      case LN_BADCONFIG:
-        PyErr_SetString(PyExc_ValueError, "bad configuration file");
-        break;
-      case LN_BADPARSERSTATE:
-        PyErr_SetString(PyExc_RuntimeError, "bad parser state");
-        break;
-      case LN_WRONGPARSER:
-        PyErr_SetString(PyExc_RuntimeError, "wrong parser");
-        break;
-      default:
-        PyErr_SetFromErrno(PyExc_OSError);
-        break;
-    }
-    return -1;
-  }
 
   return 0;
 }
@@ -102,6 +83,59 @@ static PyObject* liblognorm_get_error(ObjectInstance *self, PyObject *Py_UNUSED(
     if (self->last_error[0] == '\0')
         Py_RETURN_NONE;
     return Py_BuildValue("s", self->last_error);
+}
+
+static PyObject* liblognorm_load(ObjectInstance *self, PyObject *args)
+{
+    const char *path;
+    struct stat st;
+
+    if (!PyArg_ParseTuple(args, "s", &path))
+        return NULL;
+
+    if (stat(path, &st) != 0) {
+        PyErr_Format(PyExc_FileNotFoundError, "Path not found: %s", path);
+        return NULL;
+    }
+
+    if (S_ISREG(st.st_mode)) {
+        int result = ln_loadSamples(self->lognorm_context, path);
+        if (result != 0) {
+            PyErr_Format(PyExc_RuntimeError, "Failed to load rulebase file: %s", path);
+            return NULL;
+        }
+        Py_RETURN_NONE;
+    }
+
+    if (S_ISDIR(st.st_mode)) {
+        DIR *dir = opendir(path);
+        if (!dir) {
+            PyErr_Format(PyExc_OSError, "Cannot open directory: %s", path);
+            return NULL;
+        }
+
+        struct dirent *ent;
+        char filepath[PATH_MAX];
+        int result;
+
+        while ((ent = readdir(dir)) != NULL) {
+            if (ent->d_type != DT_REG)
+                continue;
+
+            snprintf(filepath, sizeof(filepath), "%s/%s", path, ent->d_name);
+            result = ln_loadSamples(self->lognorm_context, filepath);
+            if (result != 0) {
+                closedir(dir);
+                PyErr_Format(PyExc_RuntimeError, "Failed to load rulebase file: %s", filepath);
+                return NULL;
+            }
+        }
+        closedir(dir);
+        Py_RETURN_NONE;
+    }
+
+    PyErr_SetString(PyExc_ValueError, "Path is neither a regular file nor a directory");
+    return NULL;
 }
 
 // result = lognorm.normalize(log = "...", strip = True)
@@ -289,11 +323,16 @@ PyObject* convert_hash(json_object *obj)
 static PyMethodDef object_methods[] = {
   {"normalize", (PyCFunction)normalize, METH_VARARGS | METH_KEYWORDS,
     "parse log line to dict object"},
-  {"version", (PyCFunction)liblognorm_version, METH_VARARGS,
-    "return liblognorm's version"},
+  {"load", (PyCFunction)liblognorm_load, METH_VARARGS,
+    "Load a rulebase file or all rulebase files in a directory."},
   {"get_error", (PyCFunction)liblognorm_get_error, METH_NOARGS,
     "return last error message from liblognorm"},
   {NULL}
+};
+
+static PyMethodDef module_methods[] = {
+    {"version", liblognorm_version, METH_VARARGS, "return liblognorm's version"},
+    {NULL, NULL, 0, NULL} // Sentinel
 };
 
 static PyTypeObject TypeObject = {
@@ -342,14 +381,14 @@ static struct PyModuleDef moduledef = {
     MODULE_NAME,         /* m_name */
     MODULE_DOCSTRING,    /* m_doc */
     -1,                  /* m_size */
-    object_methods,      /* m_methods */
+    module_methods,      /* m_methods */
     NULL,                /* m_reload */
     NULL,                /* m_traverse */
     NULL,                /* m_clear */
     NULL,                /* m_free */
 };
 
-PyMODINIT_FUNC PyInit_liblognorm(void)
+PyMODINIT_FUNC PyInit__liblognorm(void)
 {
   PyObject* module;
   TypeObject.tp_new = PyType_GenericNew;
