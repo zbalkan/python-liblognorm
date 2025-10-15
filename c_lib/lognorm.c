@@ -28,8 +28,11 @@ typedef struct {
     char last_error[512];
 } ObjectInstance;
 
-static void py_err_callback(void *cookie, const char *msg, size_t lenMsg)
+static
+void py_err_callback(void *cookie, const char *msg, size_t lenMsg)
 {
+    if (!cookie || !msg)
+        return;
     ObjectInstance *self = (ObjectInstance *)cookie;
     size_t len = lenMsg < sizeof(self->last_error)-1 ? lenMsg : sizeof(self->last_error)-1;
     memcpy(self->last_error, msg, len);
@@ -50,8 +53,29 @@ int obj_init(ObjectInstance *self, PyObject *args, PyObject *kwargs)
     PyErr_SetString(LognormMemoryError, "Failed to initialize liblognorm context");
     return -1;
   }
+
+  // Enable logging
+  PyObject *logging = PyImport_ImportModule("logging");
+  if (logging) {
+    PyObject *logger = PyObject_CallMethod(logging, "getLogger", "s", "liblognorm");
+    if (logger) {
+        PyObject *isEnabledFor = PyObject_CallMethod(logger, "isEnabledFor", "i", 10); // logging.DEBUG == 10
+        if (isEnabledFor && PyObject_IsTrue(isEnabledFor)) {
+            ln_enableDebug(self->lognorm_context, 1);
+        } else {
+            ln_enableDebug(self->lognorm_context, 0);
+        }
+        Py_XDECREF(isEnabledFor);
+        Py_DECREF(logger);
+    }
+    Py_DECREF(logging);
+  }
+
+  // Initiate error callback
   self->last_error[0] = '\0';
   ln_setErrMsgCB(self->lognorm_context, py_err_callback, self);
+
+  // Load rules
   int result = ln_loadSamples(self->lognorm_context, rulebase);
   if (result != 0) {
     switch (result) {
@@ -80,11 +104,13 @@ int obj_init(ObjectInstance *self, PyObject *args, PyObject *kwargs)
 static
 void obj_dealloc(ObjectInstance *self)
 {
-  if (self->lognorm_context != NULL)
-    ln_exitCtx(self->lognorm_context);
-    memset(self->last_error, 0, sizeof(self->last_error));
-  Py_TYPE(self)->tp_free((PyObject *)self);
+    if (self->lognorm_context != NULL) {
+        ln_exitCtx(self->lognorm_context);
+        memset(self->last_error, 0, sizeof(self->last_error));
+    }
+    Py_TYPE(self)->tp_free((PyObject *)self);
 }
+
 
 static PyObject* convert_object(json_object *obj);
 
