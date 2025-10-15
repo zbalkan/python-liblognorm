@@ -124,6 +124,11 @@ static PyObject* convert_hash(json_object *obj);
 static
 PyObject* convert_object(json_object *obj)
 {
+  if (obj == NULL) {
+    Py_INCREF(Py_None);
+    return Py_None;
+  }
+
   switch (json_object_get_type(obj)) {
     case json_type_null:
     case json_type_boolean:
@@ -144,6 +149,11 @@ PyObject* convert_object(json_object *obj)
 static
 PyObject* convert_scalar(json_object *obj)
 {
+  if (obj == NULL) {
+    Py_INCREF(Py_None);
+    return Py_None;
+  }
+
   switch (json_object_get_type(obj)) {
     case json_type_null:
       Py_INCREF(Py_None);
@@ -171,6 +181,11 @@ PyObject* convert_scalar(json_object *obj)
 static
 PyObject* convert_list(json_object *obj)
 {
+  if (obj == NULL) {
+    Py_INCREF(Py_None);
+    return Py_None;
+  }
+
   PyObject *result = PyList_New(0);
   int array_length = json_object_array_length(obj);
   for (int i = 0; i < array_length; ++i) {
@@ -184,6 +199,11 @@ PyObject* convert_list(json_object *obj)
 static
 PyObject* convert_hash(json_object *obj)
 {
+  if (obj == NULL) {
+    Py_INCREF(Py_None);
+    return Py_None;
+  }
+
   PyObject *result = PyDict_New();
   struct json_object_iterator it = json_object_iter_begin(obj);
   struct json_object_iterator itEnd = json_object_iter_end(obj);
