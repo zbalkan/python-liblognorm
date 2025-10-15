@@ -16,9 +16,18 @@ static PyObject* liblognorm_version(PyObject *self, PyObject *args)
 }
 
 typedef struct {
-  PyObject_HEAD
-  ln_ctx lognorm_context;
+    PyObject_HEAD
+    ln_ctx lognorm_context;
+    char last_error[512];
 } ObjectInstance;
+
+static void py_err_callback(void *cookie, const char *msg, size_t lenMsg)
+{
+    ObjectInstance *self = (ObjectInstance *)cookie;
+    size_t len = lenMsg < sizeof(self->last_error)-1 ? lenMsg : sizeof(self->last_error)-1;
+    memcpy(self->last_error, msg, len);
+    self->last_error[len] = '\0';
+}
 
 static
 int obj_init(ObjectInstance *self, PyObject *args, PyObject *kwargs)
@@ -30,6 +39,8 @@ int obj_init(ObjectInstance *self, PyObject *args, PyObject *kwargs)
     return -1;
 
   self->lognorm_context = ln_initCtx();
+  self->last_error[0] = '\0';
+  ln_setErrMsgCB(self->lognorm_context, py_err_callback, self);
   int result = ln_loadSamples(self->lognorm_context, rulebase);
   if (result != 0) {
     switch (result) {
@@ -65,6 +76,13 @@ void obj_dealloc(ObjectInstance *self)
 
 static PyObject* convert_object(json_object *obj);
 
+static PyObject* liblognorm_get_error(ObjectInstance *self, PyObject *Py_UNUSED(ignored))
+{
+    if (self->last_error[0] == '\0')
+        Py_RETURN_NONE;
+    return Py_BuildValue("s", self->last_error);
+}
+
 // result = lognorm.normalize(log = "...", strip = True)
 static
 PyObject* normalize(ObjectInstance *self, PyObject *args, PyObject *kwargs)
@@ -93,12 +111,19 @@ PyObject* normalize(ObjectInstance *self, PyObject *args, PyObject *kwargs)
       log_entry_length--;
   }
 
+  self->last_error[0] = '\0';
   struct json_object *log = NULL;
   int norm_result = ln_normalize(self->lognorm_context, log_entry,
                                  (size_t)log_entry_length, &log);
+
   if (norm_result != 0 || log == NULL) {
-    PyErr_SetString(PyExc_RuntimeError, "Failed to normalize the log line. Ensure there is a matching rule.");
-    return NULL;
+      /* In liblognorm ≤ 2.0.x, unmatched lines return nonzero
+        but do not trigger the error callback. */
+      if (self->last_error[0] == '\0') {
+          Py_RETURN_NONE;  // treat as “no match”
+      }
+      PyErr_SetString(PyExc_RuntimeError, self->last_error);
+      return NULL;
   }
 
   PyObject *result = convert_object(log);
@@ -227,6 +252,8 @@ static PyMethodDef object_methods[] = {
     "parse log line to dict object"},
   {"version", (PyCFunction)liblognorm_version, METH_VARARGS,
     "return liblognorm's version"},
+  {"get_error", (PyCFunction)liblognorm_get_error, METH_NOARGS,
+    "return last error message from liblognorm"},
   {NULL}
 };
 
