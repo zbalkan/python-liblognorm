@@ -1,9 +1,8 @@
 # liblognorm Python bindings
 
-[**liblognorm**](https://www.liblognorm.com/) is a high-performance log normalization library capable of real-time parsing and field extraction. It converts unstructured log messages into structured formats such as JSON or [CEE](https://cee.mitre.org/), enabling consistent and efficient downstream processing.
+[**liblognorm**](https://www.liblognorm.com/) is a high-performance log normalization library capable of real-time parsing and field extraction. It converts unstructured log messages into structured formats such as JSON, enabling consistent and efficient downstream processing.
 
-This project provides **Python bindings for liblognorm 2.x**, implemented as a C extension module.
-It allows Python applications to perform normalization using the same optimized engine used in rsyslog and other production systems.
+This project provides modern, Pythonic bindings for **liblognorm 2.x**, implemented as a C extension module. It allows Python applications to perform normalization using the same optimized engine found in rsyslog and other production systems.
 
 ---
 
@@ -11,103 +10,120 @@ It allows Python applications to perform normalization using the same optimized 
 
 ### Requirements
 
-* **Python 3.5+**
-* **liblognorm 2.x** and its development headers
-* **pkg-config** utility
-* A C compiler toolchain (e.g., GCC or Clang)
+*   **Python 3.5+**
+*   **liblognorm 2.x** and its development headers
+*   **pkg-config** utility
+*   A C compiler toolchain (e.g., GCC or Clang)
 
-On Debian/Ubuntu systems:
+On Debian-based systems (like Ubuntu), you can install these with:
 
 ```bash
-sudo apt install liblognorm-dev pkg-config python3-dev build-essential
+sudo apt-get update
+sudo apt-get install liblognorm-dev pkg-config python3-dev build-essential
 ```
 
-### Build and install
+### From Source
 
-To build directly from source:
+To build and install the package directly from this source repository:
 
 ```bash
 git clone https://github.com/zaferb/python-liblognorm.git
 cd python-liblognorm
-python3 -m pip install .
+pip install .
 ```
 
-To build a wheel for distribution:
-
-```bash
-python3 -m build
-```
-
-The setup script automatically discovers compiler and linker flags using `pkg-config`.
+The setup script automatically uses `pkg-config` to discover the necessary compiler and linker flags for `liblognorm`.
 
 ---
 
 ## Usage Example
+
+The following example demonstrates how to load a rulebase and normalize log lines entered via standard input.
 
 ```python
 import liblognorm
 import json
 import sys
 
-print("liblognorm version:", liblognorm.Lognorm.version())  # C library version
+# Get the version of the linked liblognorm C library
+print(f"Using liblognorm version: {liblognorm.version()}")
 
-ln = liblognorm.Lognorm(rules="parsing.rules")  # expects a rulebase file
+try:
+    # 1. Initialize the Lognorm context
+    ln = liblognorm.Lognorm()
 
-print(">>> Ready. Enter log lines (Ctrl-D to exit):", file=sys.stderr)
+    # 2. Load normalization rules from a file or directory
+    ln.load("path/to/your/rules")
 
-while True:
-    line = sys.stdin.readline()
-    if not line:
-        break  # EOF reached
+except liblognorm.Error as e:
+    print(f"Initialization failed: {e}", file=sys.stderr)
+    sys.exit(1)
+
+print("\n>>> Ready. Enter log lines (Ctrl-D to exit):", file=sys.stderr)
+
+# 3. Process lines from stdin
+for line in sys.stdin:
     line = line.strip()
     if not line:
-        continue  # skip blank lines
-     try:
-        event = ln.normalize(line)
-        print(json.dumps(event, ensure_ascii=False, indent=4, sort_keys=True))
-    except liblognorm.Error as e:
-        print(f">>> {e}")
+        continue
 
-    # Add extra newline
-    print("----------------")
+    try:
+        # 4. Normalize the log line into a dictionary
+        event = ln.normalize(line)
+        if event:
+            print(json.dumps(event, indent=2))
+        else:
+            # This can happen if a line doesn't match any rule
+            print("--- No match ---")
+
+    except liblognorm.Error as e:
+        # Handle any normalization errors
+        print(f"Error: {e}", file=sys.stderr)
 ```
 
 ---
 
 ## Error Handling
 
-All errors are raised as subclasses of `liblognorm.Error`:
+The library uses Pythonic exceptions for error handling. All exceptions inherit from the base `liblognorm.Error`. This allows you to catch errors with fine-grained control.
 
-| Exception     | Description                              |
-| ------------- | ---------------------------------------- |
-| `MemoryError` | Out of memory                            |
-| `ConfigError` | Invalid rulebase configuration           |
-| `ParserError` | Invalid parser state or message mismatch |
-| `RuleError`   | Rulebase too large or malformed          |
-| `Error`       | Generic or unknown error                 |
+```python
+try:
+    event = ln.normalize(log_line)
+except liblognorm.ParserError:
+    print("Log line did not match any known format.")
+except liblognorm.ConfigError:
+    print("The loaded rulebase is invalid.")
+except liblognorm.Error as e:
+    print(f"A general liblognorm error occurred: {e}")
+```
 
-`normalize()` returns a Python `dict` on success or raises one of the above exceptions on failure.
+| Exception | Description |
+| :--- | :--- |
+| `liblognorm.MemoryError` | Out of memory during an operation. |
+| `liblognorm.ConfigError` | Invalid rulebase configuration. |
+| `liblognorm.ParserError` | Invalid parser state or no matching parser for a message. |
+| `liblognorm.RuleError` | A rule is malformed or exceeds size limits. |
+| `liblognorm.Error` | A generic or unknown error from the underlying library. |
 
 ---
 
 ## Type Annotations
 
-Static type definitions are provided in `liblognorm.pyi`, enabling full support for type checkers and IDE autocompletion.
+This package is fully type-hinted via a bundled `__init__.pyi` stub file. This provides an excellent developer experience with full support for static type checkers (like Mypy) and rich autocompletion in modern IDEs.
 
 ---
 
 ## Attribution and License
 
-This binding was originally developed by **Stanislaw Klekot** ([dozzie@jarowit.net](mailto:dozzie@jarowit.net)) for **Korbank S.A.** ([https://korbank.com/](https://korbank.com/)).
-Primary distribution point: [https://github.com/korbank/python-liblognorm](https://github.com/korbank/python-liblognorm)
+This binding was originally developed by **Stanislaw Klekot** ([dozzie@jarowit.net](mailto:dozzie@jarowit.net)) for **Korbank S.A.** The original project can be found at [github.com/korbank/python-liblognorm](https://github.com/korbank/python-liblognorm).
 
-This fork is maintained and modernized by **Zafer Balkan**, with:
+This fork is maintained and modernized by **Zafer Balkan**, and includes the following improvements:
 
-* Updated build system using `pkg-config`
-* Extended exception hierarchy and Python-native error handling
-* Integration with Python’s standard logging module
-* Type hints (`.pyi`) for static analysis
-* Improved memory safety and Pythonic API consistency
+*   Modernized build system using `pyproject.toml` and `pkg-config`.
+*   A fully Pythonic API with a robust exception hierarchy.
+*   Complete type hints (`.pyi`) for static analysis and IDE support.
+*   Improved memory safety and API consistency.
+*   Python 3.5+ compatibility.
 
-`python-liblognorm` is distributed under the **3-clause BSD license**.
-See the included `COPYING` file for full text.
+`python-liblognorm` is distributed under the **3-clause BSD license**. See the included `COPYING` file for the full text.
