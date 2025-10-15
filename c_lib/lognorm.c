@@ -10,6 +10,13 @@
 #define MODULE_DOCSTRING "Log normalization library."
 #define TYPE_DOCSTRING   "liblognorm context"
 
+// Exception types
+static PyObject *LognormError;          // Base exception
+static PyObject *LognormMemoryError;
+static PyObject *LognormConfigError;
+static PyObject *LognormParserError;
+static PyObject *LognormRuleError;
+
 static PyObject* liblognorm_version(PyObject *self, PyObject *args)
 {
   return Py_BuildValue("s", ln_version());
@@ -39,6 +46,10 @@ int obj_init(ObjectInstance *self, PyObject *args, PyObject *kwargs)
     return -1;
 
   self->lognorm_context = ln_initCtx();
+  if (self->lognorm_context == NULL) {
+    PyErr_SetString(LognormMemoryError, "Failed to initialize liblognorm context");
+    return -1;
+  }
   self->last_error[0] = '\0';
   ln_setErrMsgCB(self->lognorm_context, py_err_callback, self);
   int result = ln_loadSamples(self->lognorm_context, rulebase);
@@ -71,6 +82,7 @@ void obj_dealloc(ObjectInstance *self)
 {
   if (self->lognorm_context != NULL)
     ln_exitCtx(self->lognorm_context);
+    memset(self->last_error, 0, sizeof(self->last_error));
   Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
@@ -117,14 +129,32 @@ PyObject* normalize(ObjectInstance *self, PyObject *args, PyObject *kwargs)
                                  (size_t)log_entry_length, &log);
 
   if (norm_result != 0 || log == NULL) {
-      /* In liblognorm ≤ 2.0.x, unmatched lines return nonzero
-        but do not trigger the error callback. */
-      if (self->last_error[0] == '\0') {
-          Py_RETURN_NONE;  // treat as “no match”
+    switch (norm_result) {
+        case LN_NOMEM:
+            PyErr_SetString(LognormMemoryError, "Out of memory");
+            return NULL;
+        case LN_BADCONFIG:
+            PyErr_SetString(LognormConfigError, "Invalid rulebase configuration");
+            return NULL;
+        case LN_BADPARSERSTATE:
+            PyErr_SetString(LognormParserError, "Invalid parser state");
+            return NULL;
+        case LN_WRONGPARSER:
+            PyErr_SetString(LognormParserError, "No matching parser or invalid message");
+            return NULL;
+        case LN_RB_LINE_TOO_LONG:
+        case LN_OVER_SIZE_LIMIT:
+            PyErr_SetString(LognormRuleError, "Rulebase line too long or over size limit");
+            return NULL;
+        default:
+            if (self->last_error[0] != '\0')
+                PyErr_SetString(LognormError, self->last_error);
+            else
+                PyErr_SetString(LognormError, "Unknown normalization error");
+            return NULL;
       }
-      PyErr_SetString(PyExc_RuntimeError, self->last_error);
-      return NULL;
   }
+
 
   PyObject *result = convert_object(log);
 
@@ -311,7 +341,6 @@ static struct PyModuleDef moduledef = {
 };
 
 PyMODINIT_FUNC PyInit_liblognorm(void)
-
 {
   PyObject* module;
   TypeObject.tp_new = PyType_GenericNew;
@@ -320,6 +349,27 @@ PyMODINIT_FUNC PyInit_liblognorm(void)
 
 
   module = PyModule_Create(&moduledef);
+
+  // Create exception hierarchy
+  LognormError = PyErr_NewException("liblognorm.Error", NULL, NULL);
+  Py_INCREF(LognormError);
+  PyModule_AddObject(module, "Error", LognormError);
+
+  LognormMemoryError = PyErr_NewException("liblognorm.MemoryError", LognormError, NULL);
+  Py_INCREF(LognormMemoryError);
+  PyModule_AddObject(module, "MemoryError", LognormMemoryError);
+
+  LognormConfigError = PyErr_NewException("liblognorm.ConfigError", LognormError, NULL);
+  Py_INCREF(LognormConfigError);
+  PyModule_AddObject(module, "ConfigError", LognormConfigError);
+
+  LognormParserError = PyErr_NewException("liblognorm.ParserError", LognormError, NULL);
+  Py_INCREF(LognormParserError);
+  PyModule_AddObject(module, "ParserError", LognormParserError);
+
+  LognormRuleError = PyErr_NewException("liblognorm.RuleError", LognormError, NULL);
+  Py_INCREF(LognormRuleError);
+  PyModule_AddObject(module, "RuleError", LognormRuleError);
 
   Py_INCREF(&TypeObject);
   PyModule_AddObject(module, TYPE_NAME, (PyObject *)&TypeObject);
