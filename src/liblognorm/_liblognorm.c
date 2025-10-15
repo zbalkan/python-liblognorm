@@ -131,6 +131,30 @@ static PyObject* liblognorm_load(ObjectInstance *self, PyObject *args)
     return NULL;
 }
 
+static PyObject*
+liblognorm_load_from_string(ObjectInstance *self, PyObject *args)
+{
+    const char *rules;
+    if (!PyArg_ParseTuple(args, "s", &rules)) {
+        return NULL; // PyArg_ParseTuple sets the error
+    }
+
+    self->last_error[0] = '\0'; // Clear previous error message
+    int result = ln_loadSamplesFromString(self->lognorm_context, rules);
+
+    if (result != 0) {
+        // Use the error message from the callback if available
+        if (self->last_error[0] != '\0') {
+            PyErr_SetString(LognormConfigError, self->last_error);
+        } else {
+            PyErr_SetString(LognormConfigError, "Failed to load rulebase from string");
+        }
+        return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
+
 // result = lognorm.normalize(log = "...", strip = True)
 static
 PyObject* normalize(ObjectInstance *self, PyObject *args, PyObject *kwargs)
@@ -318,6 +342,8 @@ static PyMethodDef object_methods[] = {
     "parse log line to dict object"},
   {"load", (PyCFunction)liblognorm_load, METH_VARARGS,
     "Load a rulebase file or all rulebase files in a directory."},
+  {"load_from_string", (PyCFunction)liblognorm_load_from_string, METH_VARARGS,
+    "Load a rulebase from a string."},
   {NULL}
 };
 

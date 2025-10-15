@@ -74,6 +74,21 @@ class Lognorm:
         """
         ...
 
+    def load_from_string(self, rules: str) -> None:
+        """
+        Loads normalization rules directly from a string.
+
+        This is especially useful for testing or for applications where rules
+        are generated dynamically.
+
+        Args:
+            rules: A string containing the rulebase content.
+
+        Raises:
+            ConfigError: If the rulebase content is invalid.
+        """
+        ...
+
     def normalize(self, log: str, strip: bool = True) -> Optional[Dict[str, Any]]:
         """
         Normalizes a log message string against the loaded rulebase.
