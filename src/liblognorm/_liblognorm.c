@@ -43,26 +43,77 @@ void py_err_callback(void *cookie, const char *msg, size_t lenMsg)
     self->last_error[len] = '\0';
 }
 
-static
-int obj_init(ObjectInstance *self, PyObject *args, PyObject *kwargs)
+static int
+obj_init(ObjectInstance *self, PyObject *args, PyObject *kwargs)
 {
-  if ((args && PyTuple_Size(args) > 0) ||
-        (kwargs && PyDict_Size(kwargs) > 0)) {
-        PyErr_SetString(PyExc_TypeError, "Lognorm() takes no arguments");
+    // Define the keywords we will accept in the constructor
+    static char *kwlist[] = {
+        "allow_regex",
+        "add_exec_path",
+        "add_original_message",
+        "add_rule",
+        "add_rule_location",
+        NULL
+    };
+
+    // Prepare variables to hold the boolean values from Python
+    // We use PyObject* and initialize to NULL to detect if they were passed.
+    PyObject *allow_regex = NULL;
+    PyObject *add_exec_path = NULL;
+    PyObject *add_original_message = NULL;
+    PyObject *add_rule = NULL;
+    PyObject *add_rule_location = NULL;
+
+    // The format string "O|OOOOO" means the first argument is optional,
+    // and the rest are keyword-only. We will actually check for no positional args.
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OOOOO", kwlist,
+                                     &allow_regex, &add_exec_path,
+                                     &add_original_message, &add_rule,
+                                     &add_rule_location)) {
+        return -1; // Error is already set by PyArg_ParseTupleAndKeywords
+    }
+
+    // Ensure no positional arguments were passed
+    if (PyTuple_Size(args) > 0) {
+        PyErr_SetString(PyExc_TypeError, "Lognorm() takes no positional arguments.");
         return -1;
     }
 
-  self->lognorm_context = ln_initCtx();
-  if (self->lognorm_context == NULL) {
-    PyErr_SetString(LognormMemoryError, "Failed to initialize liblognorm context");
-    return -1;
-  }
+    // Initialize the liblognorm context
+    self->lognorm_context = ln_initCtx();
+    if (self->lognorm_context == NULL) {
+        PyErr_SetString(LognormMemoryError, "Failed to initialize liblognorm context");
+        return -1;
+    }
 
-  // Initiate error callback
-  self->last_error[0] = '\0';
-  ln_setErrMsgCB(self->lognorm_context, py_err_callback, self);
+    // Initiate error callback
+    self->last_error[0] = '\0';
+    ln_setErrMsgCB(self->lognorm_context, py_err_callback, self);
 
-  return 0;
+    // --- Build the options bitmask ---
+    unsigned int opts = 0;
+    if (allow_regex && PyObject_IsTrue(allow_regex)) {
+        opts |= LN_CTXOPT_ALLOW_REGEX;
+    }
+    if (add_exec_path && PyObject_IsTrue(add_exec_path)) {
+        opts |= LN_CTXOPT_ADD_EXEC_PATH;
+    }
+    if (add_original_message && PyObject_IsTrue(add_original_message)) {
+        opts |= LN_CTXOPT_ADD_ORIGINALMSG;
+    }
+    if (add_rule && PyObject_IsTrue(add_rule)) {
+        opts |= LN_CTXOPT_ADD_RULE;
+    }
+    if (add_rule_location && PyObject_IsTrue(add_rule_location)) {
+        opts |= LN_CTXOPT_ADD_RULE_LOCATION;
+    }
+
+    // If any options were set, apply them
+    if (opts > 0) {
+        ln_setCtxOpts(self->lognorm_context, opts);
+    }
+
+    return 0; // Success
 }
 
 static

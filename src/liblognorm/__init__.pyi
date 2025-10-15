@@ -49,10 +49,29 @@ class Lognorm:
     Represents a liblognorm context, holding the loaded rulebase and state.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        allow_regex: bool = False,
+        add_exec_path: bool = False,
+        add_original_message: bool = False,
+        add_rule: bool = False,
+        add_rule_location: bool = False
+    ) -> None:
         """
-        Initializes a new, empty liblognorm context.
-        Raises MemoryError on failure.
+        Initializes a new liblognorm context, optionally configuring its behavior.
+
+        All arguments are keyword-only.
+
+        Args:
+            allow_regex: Permit regex matching in rules.
+            add_exec_path: Add 'exec_path' attribute (can be time-consuming).
+            add_original_message: Always add the original message to the output.
+            add_rule: Add the rule that matched to the output.
+            add_rule_location: Add rule location (file, lineno) to metadata.
+
+        Raises:
+            MemoryError: On failure to initialize the context.
         """
         ...
 
