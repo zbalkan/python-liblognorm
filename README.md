@@ -53,17 +53,23 @@ print("liblognorm version:", liblognorm.Lognorm.version())  # C library version
 
 ln = liblognorm.Lognorm(rules="parsing.rules")  # expects a rulebase file
 
-for line in sys.stdin:
-    try:
-        event = ln.normalize(line, strip=True)
-        if event is not None:
-            print(json.dumps(event))
-    except liblognorm.ConfigError as e:
-        print("Rulebase configuration error:", e, file=sys.stderr)
-    except liblognorm.ParserError as e:
-        print("Parsing error:", e, file=sys.stderr)
+print(">>> Ready. Enter log lines (Ctrl-D to exit):", file=sys.stderr)
+
+while True:
+    line = sys.stdin.readline()
+    if not line:
+        break  # EOF reached
+    line = line.strip()
+    if not line:
+        continue  # skip blank lines
+     try:
+        event = ln.normalize(line)
+        print(json.dumps(event, ensure_ascii=False, indent=4, sort_keys=True))
     except liblognorm.Error as e:
-        print("Unhandled liblognorm error:", e, file=sys.stderr)
+        print(f">>> {e}")
+
+    # Add extra newline
+    print("----------------")
 ```
 
 ---
