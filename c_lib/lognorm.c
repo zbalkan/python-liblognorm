@@ -97,7 +97,7 @@ PyObject* normalize(ObjectInstance *self, PyObject *args, PyObject *kwargs)
   int norm_result = ln_normalize(self->lognorm_context, log_entry,
                                  (size_t)log_entry_length, &log);
   if (norm_result != 0 || log == NULL) {
-    PyErr_SetString(PyExc_RuntimeError, "error while normalizing log line");
+    PyErr_SetString(PyExc_RuntimeError, "Failed to normalize the log line. Ensure there is a matching rule.");
     return NULL;
   }
 
