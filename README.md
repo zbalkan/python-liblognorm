@@ -109,37 +109,17 @@ This package is fully type-hinted via a bundled `__init__.pyi` stub file. This p
 
 ---
 
+## Thread Safety
+
+The thread safety of this library depends on how `Lognorm` objects are used. Creating a separate `Lognorm` instance for each thread is inherently safe, as each object maintains its own independent C-level context. However, sharing a **single `Lognorm` instance across multiple threads is not safe** and will lead to race conditions unless all calls to its methods (e.g., `normalize()`, `load()`) are serialized with an external lock, such as a `threading.Lock`. For best performance and safety, the recommended approach is to instantiate a new `Lognorm` object for each thread that requires one.
+
+---
+
 ## Character Encoding
 
-The library's C core and the Python wrapper are designed to work exclusively with **UTF-8**, which is the standard encoding for modern data interchange.
+This library is designed to operate exclusively on **UTF-8** encoded text. All methods, such as `normalize()`, require a standard Python 3 **`str`** (Unicode) object as input. The wrapper will automatically raise a `TypeError` if a `bytes` object is passed.
 
-To ensure correct and secure operation, users must adhere to the following principles:
-
-1.  **Input Must Be a Python `str` (Unicode):** The `normalize()` method and other functions expect a standard Python 3 `str` object, not `bytes`. The wrapper will automatically raise a `TypeError` if `bytes` are passed.
-
-2.  **UTF-8 is the Assumed Source Encoding:** The underlying `liblognorm` C library operates natively on UTF-8 byte streams. The Python C API bridge converts Python `str` objects to UTF-8 before passing them to the C library.
-
-3.  **The User is Responsible for Correct Decoding:** It is the application developer's responsibility to ensure that any data read from external sources (files, network sockets, etc.) is correctly decoded into a Python `str` object before being passed to this library.
-
-    *   **Example: Reading a UTF-8 file (Correct):**
-        ```python
-        with open("logfile.log", "r", encoding="utf-8") as f:
-            for line in f:
-                # 'line' is a valid Unicode string
-                ln.normalize(line)
-        ```
-
-    *   **Example: Handling a UTF-16 file from a Windows source (Correct):**
-        ```python
-        with open("windows_log.log", "r", encoding="utf-16") as f:
-            for line in f:
-                # 'line' is correctly decoded into a Unicode string
-                ln.normalize(line)
-        ```
-
-4.  **Other Encodings Are Not Supported:** Passing strings that contain characters from other encodings (like Latin-1 or CP-1252) which were not properly decoded may result in a `UnicodeEncodeError` from the wrapper or incorrect parsing behavior from the C library. The library will not attempt to guess the encoding or silently fix malformed data.
-
-Following these guidelines ensures maximum performance, avoids silent data corruption, and makes your application's behavior predictable and robust.
+It is the application developer's responsibility to ensure that data from external sources (files, network streams, etc.) is correctly decoded into a `str` before being passed to the library. For example, use `open(..., encoding="utf-8")` for UTF-8 files or `open(..., encoding="utf-16")` for UTF-16 files. The library will not attempt to guess encodings or handle improperly decoded data, which may result in a `UnicodeEncodeError` or incorrect parsing.
 
 ---
 
