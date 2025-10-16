@@ -55,6 +55,10 @@ try:
     # 2. Load normalization rules from a file or directory
     ln.load("path/to/your/rules")
 
+    # Alternatively, for testing or dynamic rules, load from a string:
+    # rule_string = "rule=:%host:word%:%msg:rest%"
+    # ln.load_from_string(rule_string)
+
 except liblognorm.Error as e:
     print(f"Initialization failed: {e}", file=sys.stderr)
     sys.exit(1)
