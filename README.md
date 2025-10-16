@@ -49,8 +49,9 @@ import sys
 print(f"Using liblognorm version: {liblognorm.version()}")
 
 try:
-    # 1. Initialize the Lognorm context
-    ln = liblognorm.Lognorm()
+    # 1. Initialize the Lognorm context, enabling specific options
+    #    (All options are keyword-only and default to False)
+    ln = liblognorm.Lognorm(add_rule=True, add_original_message=True)
 
     # 2. Load normalization rules from a file or directory
     ln.load("path/to/your/rules")
